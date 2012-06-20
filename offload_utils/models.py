@@ -23,4 +23,6 @@ class OffloadedTask(models.Model):
 
 class RegisteredOffloadableFunction(models.Model):
 
+    name = models.CharField(max_length=128)
     function = models.TextField()
+    description = models.TextField(null=True, blank=True)

@@ -21,6 +21,7 @@ setup(name='django-offload-utils',
           # -*- Extra requirements: -*-
           'django-celery',
           'django-jsonfield',
+          'django-annoying',
       ],
       entry_points="""
       # -*- Entry points: -*-
