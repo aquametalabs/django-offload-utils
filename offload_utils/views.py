@@ -1,30 +1,74 @@
-from annoying.decorators import ajax_request
+import json
 
-from offload_utils.models import RegisteredOffloadableFunction, OffloadedTask
+from annoying.decorators import ajax_request
+from celery.result import AsyncResult
+from django.shortcuts import get_object_or_404
+
+from offload_utils.models import RegisteredOffloadableFunctionSet, OffloadedTask
 from offload_utils.utils import import_class
+from offload_utils.tasks import offload_wrapper
 
 
 @ajax_request
 def start_offload(request):
-    print request.POST['extras']
     success = True
     error_message = False
     function_name = request.POST['function_name']
+    uid = request.POST['uid']
     try:
-        offloadable_function_meta = RegisteredOffloadableFunction.objects.get(name=function_name)
-    except RegisteredOffloadableFunction.DoesNotExist:
+        offloadable_function_meta = RegisteredOffloadableFunctionSet.objects.get(name=function_name)
+    except RegisteredOffloadableFunctionSet.DoesNotExist:
         success = False
         error_message = '%s has not been registered.' % function_name
-        return locals()
+        return {'success': success, 'error_message': error_message}
     callable = import_class(offloadable_function_meta.function)
-    task_res = callable.delay()
+    extras = json.loads(request.POST['extras'])
+    task_res = offload_wrapper.delay(callable, **extras)
+    OffloadedTask.objects.filter(uid=uid).update(stale=True)
     task = OffloadedTask.objects.create(function=offloadable_function_meta,
             celery_task_id=task_res.task_id, data_type=request.POST['datatype'],
+            extras=request.POST['extras'], uid=uid
             )
     return {'success': success, 'error_message': error_message}
 
 
 @ajax_request
-def offload_status(request, celery_task_id):
-    task = OffloadedTask.objects.get(celery_task_id=celery_task_id)
-    return {'success': True, 'completed': False}
+def check_status(request):
+    completed = False
+    success = False
+    status = None
+    uid = request.POST['uid']
+    try:
+        offload_task = OffloadedTask.objects.get(stale=False, uid=uid)
+    except OffloadedTask.DoesNotExist:
+        offload_task = None
+    if offload_task:
+        celery_task = AsyncResult(task_id=offload_task.celery_task_id)
+        if celery_task.status == 'SUCCESS':
+            completed = True
+            success = True
+            status = celery_task.status
+        elif celery_task.status == 'STARTED':
+            completed = False
+            success = True
+            status = celery_task.status
+        else:
+            completed = False
+            success = False
+            status = celery_task.status
+        return {
+            'completed': completed,
+            'success': success,
+            'status': status,
+            'uid': uid,
+            'finished_timestamp': offload_task.finished_timestamp if offload_task else None,
+            'has_task': bool(offload_task or False),
+        }
+    success = True
+    return {
+        'completed': completed,
+        'success': success,
+        'status': status,
+        'uid': uid,
+        'has_task': bool(offload_task or False),
+    }
