@@ -14,10 +14,10 @@ function offload_ajax(element, success_callback, failure_callback, extras) {
         type:'POST',
         dataType: 'json',
         success: function(data) {
-            success_callback(data, element);
+            success_callback(data, $(this));
         },
         error: function(err) {
-            failure_callback(err);
+            failure_callback(err, $(this));
         }
     });
 }
@@ -40,5 +40,5 @@ function offload_check_status(success_callback, failure_callback) {
             }
         });
     });
-    setTimeout(function(){offload_check_status(success_callback, failure_callback)}, 10000);
+    setTimeout(function(){offload_check_status(success_callback, failure_callback)}, 5000);
 }

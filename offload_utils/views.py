@@ -43,11 +43,14 @@ def check_status(request):
     except OffloadedTask.DoesNotExist:
         offload_task = None
     if offload_task:
+        ret = {}
         celery_task = AsyncResult(task_id=offload_task.celery_task_id)
         if celery_task.status == 'SUCCESS':
             completed = True
             success = True
             status = celery_task.status
+            callable = import_class(offload_task.function.retriever)
+            ret['file_url'] = callable(**offload_task.extras)
         elif celery_task.status == 'STARTED':
             completed = False
             success = True
@@ -56,14 +59,13 @@ def check_status(request):
             completed = False
             success = False
             status = celery_task.status
-        return {
-            'completed': completed,
-            'success': success,
-            'status': status,
-            'uid': uid,
-            'finished_timestamp': offload_task.finished_timestamp if offload_task else None,
-            'has_task': bool(offload_task or False),
-        }
+        ret['completed'] = completed
+        ret['success'] = success
+        ret['status'] = status
+        ret['uid'] = uid
+        ret['finished_timestamp'] = offload_task.finished_timestamp if offload_task else None
+        ret['has_task'] = bool(offload_task or False)
+        return ret
     success = True
     return {
         'completed': completed,
