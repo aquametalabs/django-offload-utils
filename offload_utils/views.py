@@ -23,12 +23,13 @@ def start_offload(request):
         return {'success': success, 'error_message': error_message}
     callable = import_class(offloadable_function_meta.function)
     extras = json.loads(request.POST['extras'])
-    task_res = offload_wrapper.delay(callable, **extras)
     OffloadedTask.objects.filter(uid=uid).update(stale=True)
     task = OffloadedTask.objects.create(function=offloadable_function_meta,
-            celery_task_id=task_res.task_id, data_type=request.POST['datatype'],
-            extras=request.POST['extras'], uid=uid
-            )
+            data_type=request.POST['datatype'], extras=request.POST['extras'],
+            uid=uid)
+    task_res = offload_wrapper.delay(callable, offload_task_id=task.pk, **extras)
+    task.celery_task_id = task_res.task_id
+    task.save()
     return {'success': success, 'error_message': error_message}
 
 

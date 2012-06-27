@@ -17,7 +17,7 @@ class OffloadedTask(models.Model):
     uid = models.CharField(max_length=255)
     start_timestamp = models.DateTimeField(auto_now_add=True)
     finished_timestamp = models.DateTimeField(null=True, blank=True)
-    celery_task_id = models.CharField(max_length=255)
+    celery_task_id = models.CharField(max_length=255, null=True, blank=False)
     data_type = models.IntegerField(choices=DATA_TYPE_CHOICES)
     extras = JSONField(null=True, blank=True)
     stale = models.BooleanField(default=False)

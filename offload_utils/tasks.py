@@ -1,26 +1,20 @@
 from datetime import datetime
 
-from django.conf import settings
-
+import django.dispatch
 from celery.task import task
-import telegram
 
 from offload_utils.models import OffloadedTask
 
 
+pre_offload = django.dispatch.Signal()
+post_offload = django.dispatch.Signal(providing_args=['callable_return'])
+
+
 @task
-def offload_wrapper(callable, *args, **kwargs):
+def offload_wrapper(callable, offloaded_task_id, *args, **kwargs):
+    pre_offload.send(sender=offload_wrapper)
+    offloaded_task = OffloadedTask.objects.get(pk=offloaded_task_id)
     ret = callable(*args, **kwargs)
-    if (getattr(settings, 'OFFLOAD_UTILS_NOTIFICATIONS', False) and 
-            getattr(settings, 'OFFLOAD_UTILS_TELEGRAM_CHANNEL', False) and
-            ret.has_key('telegram_subject') and
-            ret.has_key('telegram_content')):
-        telegram_extras = {}
-        if kwargs.has_key('telegram_extras'):
-            telegram_extras = kwargs['telegram_extras']
-        telegram.broadcast(
-            settings.OFFLOAD_UTILS_TELEGRAM_CHANNEL,
-            ret['telegram_subject'],
-            ret['telegram_content'],
-            add_to_queue=False,
-            **telegram_extras)
+    offloaded_task.finished_timestamp = datetime.now()
+    offloaded_task.save()
+    post_offload(sender=offload_wrapper, callable_return=ret)
