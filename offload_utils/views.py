@@ -2,7 +2,6 @@ import json
 
 from annoying.decorators import ajax_request
 from celery.result import AsyncResult
-from django.shortcuts import get_object_or_404
 
 from offload_utils.models import RegisteredOffloadableFunctionSet, OffloadedTask
 from offload_utils.utils import import_class
